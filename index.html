@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loonboek — Flexi-verdiensten</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Loonboek">
+<meta name="theme-color" content="#22281F">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-loonboek-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icon-loonboek-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icon-loonboek-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icon-loonboek-120.png">
+<link rel="icon" sizes="32x32" href="icon-loonboek-32.png">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDE6D6; --paper-2:#E4DAC5; --card:#F6F1E6;
+  --ink:#22281F; --ink-soft:#565F4E; --rule:#C9BC9C;
+  --brass:#8C6A22; --brass-deep:#6E5119;
+  --wine:#6E1F2E; --wine-soft:#9C4C56; --sage:#5E6E55;
+  --shadow: 0 1px 2px rgba(34,40,31,0.06), 0 6px 18px rgba(34,40,31,0.08);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  background:radial-gradient(circle at 20% 0%, rgba(140,106,34,0.06), transparent 40%), var(--paper);
+  color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;
+}
+.app{max-width:460px;margin:0 auto;padding:0 0 48px;}
+header{padding:24px 20px 16px;border-bottom:1px solid var(--rule);background:linear-gradient(180deg, rgba(140,106,34,0.05), transparent);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+header .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-deep);margin:0 0 4px;}
+header h1{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:34px;line-height:1;margin:0 0 4px;color:var(--ink);}
+header p.sub{margin:0;color:var(--ink-soft);font-size:13.5px;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--sage);margin-top:8px;flex-shrink:0;box-shadow:0 0 0 3px rgba(94,110,85,0.15);}
+.sync-dot.uit{background:#B08A3A;}
+
+nav.tabs{display:flex;gap:2px;padding:14px 10px 0;border-bottom:1px solid var(--rule);overflow-x:auto;}
+nav.tabs button{flex:1;padding:10px 4px;background:none;border:none;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+nav.tabs button.active{color:var(--wine);border-bottom-color:var(--wine);}
+
+main{padding:20px 16px 8px;}
+.view{display:none;}
+.view.active{display:block;animation:fadein .25s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+.card{background:var(--card);border:1px solid var(--rule);border-radius:10px;box-shadow:var(--shadow);padding:16px;margin-bottom:14px;}
+.card h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:19px;margin:0 0 12px;color:var(--ink);}
+
+.saldo-hero{background:linear-gradient(160deg, var(--ink) 0%, #303826 100%);color:var(--paper);border-radius:12px;padding:22px 20px;margin-bottom:14px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.saldo-hero::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 26px);}
+.saldo-hero .label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#C9BFA0;margin:0 0 6px;position:relative;}
+.saldo-hero .bedrag{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:36px;line-height:1;margin:0;position:relative;font-variant-numeric:tabular-nums;}
+.saldo-hero .sub{font-size:12.5px;color:#B9C2AC;margin-top:8px;position:relative;}
+
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.stat{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:14px;box-shadow:var(--shadow);}
+.stat .label{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.08em;margin:0 0 4px;}
+.stat .val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:19px;font-variant-numeric:tabular-nums;margin:0;}
+.stat.effectief .val{color:var(--brass-deep);}
+.stat.prognose .val{color:var(--sage);}
+.stat.uitgaven .val{color:var(--wine);}
+.stat.uren .val{color:var(--ink);}
+
+.doel-box .rij{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.doel-box .naam{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:18px;}
+.doel-box .cijfers{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink-soft);}
+.progress-track{height:10px;border-radius:6px;background:var(--paper-2);border:1px solid var(--rule);overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg, var(--brass) 0%, var(--brass-deep) 100%);border-radius:6px;transition:width .4s ease;}
+.doel-empty{text-align:center;padding:10px 0 4px;color:var(--ink-soft);font-size:13.5px;}
+.link-btn{background:none;border:none;color:var(--wine);font-weight:600;font-size:13px;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px;}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.form-grid.full{grid-template-columns:1fr;}
+label{display:block;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;text-transform:uppercase;letter-spacing:.06em;}
+input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--rule);border-radius:7px;background:#fff;font-family:'Inter',sans-serif;font-size:14.5px;color:var(--ink);}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-offset:1px;}
+.btn{width:100%;padding:12px;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-weight:600;font-size:14.5px;cursor:pointer;background:var(--wine);color:#fff;margin-top:4px;}
+.btn:active{transform:translateY(1px);}
+.btn.brass{background:var(--brass-deep);}
+.hint{font-size:12px;color:var(--ink-soft);margin:4px 2px 0;}
+
+.ticket{position:relative;background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:14px 14px 14px 16px;margin-bottom:10px;box-shadow:var(--shadow);border-left:3px dashed var(--rule);}
+.ticket-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.ticket-date{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:19px;line-height:1.1;}
+.ticket-date .dag{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:2px;}
+.ticket-bedrag{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:19px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.ticket-meta{display:flex;gap:14px;margin-top:8px;font-size:12.5px;color:var(--ink-soft);flex-wrap:wrap;}
+.ticket-meta b{color:var(--ink);font-family:'IBM Plex Mono',monospace;font-weight:600;}
+.stamp{position:absolute;top:10px;right:14px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;border:1.5px solid;border-radius:4px;padding:2px 7px;transform:rotate(6deg);opacity:.9;}
+.stamp.effectief{color:var(--sage);border-color:var(--sage);}
+.stamp.prognose{color:var(--wine-soft);border-color:var(--wine-soft);}
+.ticket-actions{display:flex;gap:14px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);flex-wrap:wrap;}
+.ticket-actions button{background:none;border:none;font-size:12px;color:var(--ink-soft);cursor:pointer;padding:0;font-weight:600;}
+.ticket-actions button.del{color:var(--wine);}
+
+.uitgave{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--rule);}
+.uitgave:last-child{border-bottom:none;}
+.uitgave .omschr{font-weight:600;font-size:14.5px;}
+.uitgave .meta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.uitgave .bedrag{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--wine);white-space:nowrap;font-variant-numeric:tabular-nums;}
+.uitgave .del{background:none;border:none;color:var(--ink-soft);font-size:11px;cursor:pointer;margin-top:4px;padding:0;}
+
+.fiche-item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--rule);}
+.fiche-item:last-child{border-bottom:none;}
+.fiche-item .icon{font-size:20px;flex-shrink:0;}
+.fiche-item a{flex:1;color:var(--brass-deep);font-weight:600;font-size:14px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fiche-item .del{background:none;border:none;color:var(--wine);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;}
+.upload-row{display:flex;gap:8px;margin-top:4px;}
+.upload-row label.filebtn{background:var(--brass-deep);color:#fff;border:none;border-radius:7px;padding:0 14px;font-family:'Inter',sans-serif;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;white-space:nowrap;}
+.upload-row label.filebtn input{display:none;}
+
+.empty{text-align:center;padding:30px 10px;color:var(--ink-soft);font-size:14px;}
+.empty .icon{font-size:26px;display:block;margin-bottom:8px;opacity:.5;}
+.section-label{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--brass-deep);margin:20px 0 10px 2px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div>
+      <p class="eyebrow">Danny Desmet · VDV Mechelen</p>
+      <h1>Loonboek</h1>
+      <p class="sub">Flexi-shifts, gewerkte uren en waarvoor het spaart</p>
+    </div>
+    <div class="sync-dot" id="syncDot" title="Live gesynchroniseerd"></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="overzicht" class="active">Overzicht</button>
+    <button data-tab="diensten">Diensten</button>
+    <button data-tab="uitgaven">Uitgaven</button>
+    <button data-tab="fiches">Loonfiches</button>
+  </nav>
+
+  <main>
+
+    <!-- OVERZICHT -->
+    <section id="overzicht" class="view active">
+      <div class="saldo-hero">
+        <p class="label">Saldo (effectief − uitgaven)</p>
+        <p class="bedrag" id="saldoEffectief">€ 0,00</p>
+        <p class="sub" id="saldoMetPrognoseTekst">incl. prognose: € 0,00</p>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat effectief"><p class="label">Effectief verdiend</p><p class="val" id="statEffectief">€ 0,00</p></div>
+        <div class="stat prognose"><p class="label">Nog te verwachten</p><p class="val" id="statPrognose">€ 0,00</p></div>
+        <div class="stat uitgaven"><p class="label">Uitgaven</p><p class="val" id="statUitgaven">€ 0,00</p></div>
+        <div class="stat uren"><p class="label">Uren dit overzicht</p><p class="val" id="statUren">0 u</p></div>
+      </div>
+
+      <div class="card doel-box" id="doelKaart">
+        <h2>Spaardoel</h2>
+        <div id="doelInhoud"></div>
+      </div>
+
+      <div class="card">
+        <h2>Uurloon</h2>
+        <p class="hint">Weekdagen € 14,00/u · zondag € 16,00/u — automatisch bepaald op basis van de ingevoerde datum.</p>
+        <p class="hint">Gegevens worden live gesynchroniseerd tussen je toestellen.</p>
+      </div>
+    </section>
+
+    <!-- DIENSTEN -->
+    <section id="diensten" class="view">
+      <div class="card">
+        <h2>Nieuwe dienst</h2>
+        <form id="shiftForm">
+          <div class="form-grid full"><div><label for="sDate">Datum</label><input type="date" id="sDate" required></div></div>
+          <div class="form-grid">
+            <div><label for="sPlanned">Geplande uren</label><input type="number" id="sPlanned" step="0.01" min="0" placeholder="bv. 3,5" required></div>
+            <div><label for="sActual">Effectief (optioneel)</label><input type="number" id="sActual" step="0.01" min="0" placeholder="leeg = prognose"></div>
+          </div>
+          <div class="form-grid full"><div><label for="sNote">Notitie (optioneel)</label><input type="text" id="sNote" placeholder="bv. banqueting, ontbijt..."></div></div>
+          <button type="submit" class="btn">Dienst toevoegen</button>
+        </form>
+      </div>
+      <div class="section-label">Overzicht diensten</div>
+      <div id="shiftList"></div>
+    </section>
+
+    <!-- UITGAVEN -->
+    <section id="uitgaven" class="view">
+      <div class="card">
+        <h2>Nieuwe uitgave</h2>
+        <form id="expenseForm">
+          <div class="form-grid">
+            <div><label for="eDate">Datum</label><input type="date" id="eDate" required></div>
+            <div><label for="eAmount">Bedrag (€)</label><input type="number" id="eAmount" step="0.01" min="0" placeholder="0,00" required></div>
+          </div>
+          <div class="form-grid full"><div><label for="eDesc">Omschrijving</label><input type="text" id="eDesc" placeholder="bv. vlucht Aveiro" required></div></div>
+          <div class="form-grid full"><div><label for="eGoal">Waarvoor (optioneel label)</label><input type="text" id="eGoal" placeholder="bv. reis Portugal, 70ste verjaardag"></div></div>
+          <button type="submit" class="btn">Uitgave toevoegen</button>
+        </form>
+      </div>
+      <div class="section-label">Overzicht uitgaven</div>
+      <div id="expenseList"></div>
+    </section>
+
+    <!-- LOONFICHES -->
+    <section id="fiches" class="view">
+      <div class="card">
+        <h2>Loonfiche uploaden</h2>
+        <div class="form-grid full"><div><label for="fLabel">Periode</label><input type="text" id="fLabel" placeholder="bv. Augustus 2026"></div></div>
+        <div class="upload-row">
+          <label class="filebtn">📎 Kies bestand (foto of PDF)<input type="file" accept="image/*,application/pdf" id="fFile" onchange="handleFicheFile()"></label>
+        </div>
+        <p class="hint" id="ficheStatus">Foto's worden automatisch gecomprimeerd. PDF's blijven onaangeroerd.</p>
+      </div>
+      <div class="section-label">Opgeladen loonfiches</div>
+      <div id="ficheList"></div>
+    </section>
+
+  </main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC399MvSiF3PWF_ZTdFr0UqaoC6Fo7WsrY",
+  authDomain: "wiezen-club.firebaseapp.com",
+  projectId: "wiezen-club",
+  storageBucket: "wiezen-club.firebasestorage.app",
+  messagingSenderId: "184449254432",
+  appId: "1:184449254432:web:e4f4f93acae57a9a736845"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const storage = getStorage(fbApp);
+const boekRef = doc(db, 'loonboek', 'danny');
+
+const $ = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+
+let data = { shifts:[], expenses:[], settings:{goalName:'',goalAmount:0}, fiches:[] };
+
+function opslaan(partial){
+  Object.assign(data, partial);
+  const dot = $('#syncDot'); if(dot) dot.classList.add('uit');
+  setDoc(boekRef, partial, { merge:true })
+    .then(()=>{ if(dot) dot.classList.remove('uit'); })
+    .catch(e=>{ console.error('opslaan mislukt', e); });
+}
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function rateFor(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.getDay()===0 ? 16 : 14; }
+function eur(n){ return '€ ' + (n||0).toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function dayLabel(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {weekday:'short'}).replace('.',''); }
+function fmtDate(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {day:'2-digit', month:'short', year:'numeric'}); }
+function esc(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// tabs
+$$('.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    $$('.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    $$('.view').forEach(v=>v.classList.remove('active'));
+    $('#'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// forms
+$('#shiftForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const date = $('#sDate').value;
+  const planned = parseFloat($('#sPlanned').value)||0;
+  const actualRaw = $('#sActual').value;
+  const actual = actualRaw === '' ? null : parseFloat(actualRaw);
+  const note = $('#sNote').value.trim();
+  if(!date || planned<=0) return;
+  const shifts = [...data.shifts, {id:uid(), date, planned, actual, note}];
+  opslaan({shifts});
+  e.target.reset();
+  $('#sDate').value = new Date().toISOString().slice(0,10);
+});
+
+$('#expenseForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const date = $('#eDate').value;
+  const amount = parseFloat($('#eAmount').value)||0;
+  const desc = $('#eDesc').value.trim();
+  const goal = $('#eGoal').value.trim();
+  if(!date || amount<=0 || !desc) return;
+  const expenses = [...data.expenses, {id:uid(), date, amount, desc, goal}];
+  opslaan({expenses});
+  e.target.reset();
+  $('#eDate').value = new Date().toISOString().slice(0,10);
+});
+
+window.deleteShift = function(id){
+  opslaan({shifts: data.shifts.filter(s=>s.id!==id)});
+};
+window.deleteExpense = function(id){
+  opslaan({expenses: data.expenses.filter(x=>x.id!==id)});
+};
+window.quickToggleActual = function(id){
+  const s = data.shifts.find(x=>x.id===id);
+  if(!s) return;
+  let updated;
+  if(s.actual !== null && s.actual !== undefined){
+    updated = data.shifts.map(x=> x.id===id ? {...x, actual:null} : x);
+  } else {
+    const v = prompt('Effectief gewerkte uren voor '+fmtDate(s.date)+':', s.planned);
+    if(v===null) return;
+    const val = parseFloat(v.replace(',','.'))||0;
+    updated = data.shifts.map(x=> x.id===id ? {...x, actual:val} : x);
+  }
+  opslaan({shifts: updated});
+};
+window.editGoal = function(){
+  const name = prompt('Naam van het spaardoel (bv. "70ste verjaardag" of "Reis Portugal")', data.settings.goalName||'');
+  if(name === null) return;
+  const amountRaw = prompt('Doelbedrag in €', data.settings.goalAmount||'');
+  if(amountRaw === null) return;
+  opslaan({settings: {goalName:name.trim(), goalAmount: parseFloat(amountRaw.replace(',','.'))||0}});
+};
+window.verwijderFiche = function(i){
+  if(!confirm('Deze loonfiche verwijderen uit de lijst?')) return;
+  const fiches = data.fiches.slice(); fiches.splice(i,1);
+  opslaan({fiches});
+};
+
+// ---- loonfiche upload ----
+function compressImage(file, maxDim, quality){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+      else if (h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function uploadFiche(file){
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if(isPdf){
+    const bestandsnaam = 'loonboek_' + Date.now() + '.pdf';
+    const ref = storageRef(storage, 'loonfiches/' + bestandsnaam);
+    await uploadBytes(ref, file, {contentType:'application/pdf'});
+    return {url: await getDownloadURL(ref), type:'pdf'};
+  }
+  let blob = await compressImage(file, 1600, 0.75);
+  if (blob.size > 900000){ blob = await compressImage(file, 1200, 0.6); }
+  const bestandsnaam = 'loonboek_' + Date.now() + '.jpg';
+  const ref = storageRef(storage, 'loonfiches/' + bestandsnaam);
+  await uploadBytes(ref, blob);
+  return {url: await getDownloadURL(ref), type:'image'};
+}
+window.handleFicheFile = async function(){
+  const fileInp = $('#fFile');
+  const labelInp = $('#fLabel');
+  const statusEl = $('#ficheStatus');
+  const file = fileInp.files && fileInp.files[0];
+  if(!file) return;
+  const label = labelInp.value.trim() || file.name;
+  statusEl.textContent = '⏳ Bezig met uploaden...';
+  try{
+    const {url, type} = await uploadFiche(file);
+    const fiches = [...data.fiches, {id:uid(), label, url, type, datum: new Date().toISOString().slice(0,10)}];
+    opslaan({fiches});
+    labelInp.value = '';
+    fileInp.value = '';
+    statusEl.textContent = 'Foto\'s worden automatisch gecomprimeerd. PDF\'s blijven onaangeroerd.';
+  }catch(err){
+    console.error(err);
+    statusEl.textContent = '⚠️ Uploaden mislukt, probeer opnieuw.';
+  }
+};
+
+// ---- render ----
+function computeTotals(){
+  let effectief=0, prognose=0, urenEffectief=0, urenPrognose=0;
+  data.shifts.forEach(s=>{
+    const rate = rateFor(s.date);
+    if(s.actual !== null && s.actual !== undefined){
+      effectief += s.actual * rate; urenEffectief += s.actual;
+    } else {
+      prognose += s.planned * rate; urenPrognose += s.planned;
+    }
+  });
+  const totUitgaven = data.expenses.reduce((a,x)=>a+x.amount,0);
+  return {effectief, prognose, urenEffectief, urenPrognose, totUitgaven};
+}
+
+function render(){
+  const t = computeTotals();
+  const saldoEff = t.effectief - t.totUitgaven;
+  const saldoMet = (t.effectief + t.prognose) - t.totUitgaven;
+
+  $('#saldoEffectief').textContent = eur(saldoEff);
+  $('#saldoMetPrognoseTekst').textContent = 'incl. prognose: ' + eur(saldoMet);
+  $('#statEffectief').textContent = eur(t.effectief);
+  $('#statPrognose').textContent = eur(t.prognose);
+  $('#statUitgaven').textContent = eur(t.totUitgaven);
+  $('#statUren').textContent = (t.urenEffectief + t.urenPrognose).toLocaleString('nl-BE',{maximumFractionDigits:2}) + ' u';
+
+  const doelEl = $('#doelInhoud');
+  const settings = data.settings || {};
+  if(settings.goalName && settings.goalAmount>0){
+    const pct = Math.max(0, Math.min(100, Math.round((saldoMet / settings.goalAmount)*100)));
+    doelEl.innerHTML = `
+      <div class="rij"><span class="naam">${esc(settings.goalName)}</span><span class="cijfers">${eur(saldoMet)} / ${eur(settings.goalAmount)}</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <p class="hint">${pct}% gedekt (incl. prognose) · <button class="link-btn" onclick="editGoal()">wijzig doel</button></p>`;
+  } else {
+    doelEl.innerHTML = `<p class="doel-empty">Nog geen spaardoel ingesteld.</p><button class="link-btn" onclick="editGoal()">+ spaardoel instellen</button>`;
+  }
+
+  const shiftListEl = $('#shiftList');
+  if(data.shifts.length===0){
+    shiftListEl.innerHTML = `<div class="empty"><span class="icon">🎟️</span>Nog geen diensten ingevoerd.</div>`;
+  } else {
+    const sorted = [...data.shifts].sort((a,b)=> b.date.localeCompare(a.date));
+    shiftListEl.innerHTML = sorted.map(s=>{
+      const rate = rateFor(s.date);
+      const isEff = s.actual !== null && s.actual !== undefined;
+      const uren = isEff ? s.actual : s.planned;
+      const bedrag = uren * rate;
+      return `
+      <div class="ticket">
+        <span class="stamp ${isEff?'effectief':'prognose'}">${isEff?'Effectief':'Prognose'}</span>
+        <div class="ticket-top"><div class="ticket-date"><span class="dag">${dayLabel(s.date)}</span>${fmtDate(s.date)}</div></div>
+        <div class="ticket-meta"><span>Gepland <b>${s.planned}u</b></span><span>Effectief <b>${isEff ? s.actual+'u' : '—'}</b></span><span>€${rate}/u</span></div>
+        ${s.note ? `<p class="hint" style="margin-top:6px;">${esc(s.note)}</p>` : ''}
+        <div class="ticket-bedrag" style="margin-top:8px;">${eur(bedrag)}</div>
+        <div class="ticket-actions">
+          <button onclick="quickToggleActual('${s.id}')">${isEff?'zet terug op prognose':'markeer als effectief'}</button>
+          <button class="del" onclick="deleteShift('${s.id}')">verwijderen</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const expListEl = $('#expenseList');
+  if(data.expenses.length===0){
+    expListEl.innerHTML = `<div class="empty"><span class="icon">🧾</span>Nog geen uitgaven ingevoerd.</div>`;
+  } else {
+    const sortedE = [...data.expenses].sort((a,b)=> b.date.localeCompare(a.date));
+    expListEl.innerHTML = `<div class="card">` + sortedE.map(x=>`
+      <div class="uitgave">
+        <div>
+          <div class="omschr">${esc(x.desc)}</div>
+          <div class="meta">${fmtDate(x.date)}${x.goal ? ' · '+esc(x.goal) : ''}</div>
+          <button class="del" onclick="deleteExpense('${x.id}')">verwijderen</button>
+        </div>
+        <div class="bedrag">− ${eur(x.amount)}</div>
+      </div>`).join('') + `</div>`;
+  }
+
+  const ficheListEl = $('#ficheList');
+  const fiches = data.fiches || [];
+  if(fiches.length===0){
+    ficheListEl.innerHTML = `<div class="empty"><span class="icon">📄</span>Nog geen loonfiches opgeladen.</div>`;
+  } else {
+    const sortedF = [...fiches].sort((a,b)=> (b.datum||'').localeCompare(a.datum||''));
+    ficheListEl.innerHTML = `<div class="card">` + sortedF.map((f)=>`
+      <div class="fiche-item">
+        <span class="icon">${f.type==='pdf'?'📄':'🖼️'}</span>
+        <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.label)}</a>
+        <button class="del" onclick="verwijderFiche(${fiches.indexOf(f)})">verwijderen</button>
+      </div>`).join('') + `</div>`;
+  }
+}
+
+// ---- eenmalige startgegevens (uit reeds besproken loonfiches, tijdregistraties en agenda) ----
+const SEED_DATA = {
+  shifts: [
+    {id:uid(), date:'2026-05-25', planned:4.88, actual:4.88, note:'loonfiche mei — zondag'},
+    {id:uid(), date:'2026-06-13', planned:4.10, actual:4.10, note:'loonfiche juni'},
+    {id:uid(), date:'2026-06-16', planned:5.25, actual:5.25, note:'loonfiche juni'},
+    {id:uid(), date:'2026-06-27', planned:4.30, actual:4.30, note:'loonfiche juni'},
+    {id:uid(), date:'2026-07-05', planned:7.93, actual:7.93, note:'loonfiche juli — zondag'},
+    {id:uid(), date:'2026-07-07', planned:5.18, actual:5.18, note:'loonfiche juli'},
+    {id:uid(), date:'2026-07-12', planned:3.02, actual:3.02, note:'loonfiche juli — zondag'},
+    {id:uid(), date:'2026-07-21', planned:3.83, actual:3.83, note:'loonfiche juli — zondag'},
+    {id:uid(), date:'2026-07-23', planned:3.52, actual:3.52, note:'loonfiche juli'},
+    {id:uid(), date:'2026-07-27', planned:3.42, actual:3.42, note:'loonfiche juli'},
+    {id:uid(), date:'2026-08-01', planned:3.73, actual:3.73, note:'ontbijt — tijdregistratie'},
+    {id:uid(), date:'2026-08-02', planned:8.02, actual:8.02, note:'banqueting — tijdregistratie, zondag'},
+    {id:uid(), date:'2026-08-06', planned:4.00, actual:4.00, note:'ontbijt — tijdregistratie'},
+    {id:uid(), date:'2026-08-08', planned:5.58, actual:5.58, note:'banqueting — tijdregistratie'},
+    {id:uid(), date:'2026-08-09', planned:6.67, actual:6.67, note:'banqueting — tijdregistratie, zondag'},
+    {id:uid(), date:'2026-08-16', planned:4.95, actual:4.95, note:'ontbijt — tijdregistratie, zondag'},
+    {id:uid(), date:'2026-08-23', planned:3.77, actual:3.77, note:'ontbijt — tijdregistratie, zondag'},
+    {id:uid(), date:'2026-08-29', planned:4.00, actual:null, note:'ontbijt — prognose (Werktijden)'},
+    {id:uid(), date:'2026-08-29', planned:7.50, actual:null, note:'banqueting 17:30-01:00 — prognose (Werktijden)'},
+    {id:uid(), date:'2026-08-30', planned:5.00, actual:null, note:'banqueting — prognose (Werktijden)'},
+    {id:uid(), date:'2026-09-02', planned:5.00, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-03', planned:3.00, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-05', planned:4.00, actual:null, note:'ontbijt — prognose, zaterdag'},
+    {id:uid(), date:'2026-09-06', planned:3.50, actual:null, note:'ontbijt — prognose, zondag'},
+    {id:uid(), date:'2026-09-06', planned:5.00, actual:null, note:'banqueting — prognose, zondag'},
+    {id:uid(), date:'2026-09-09', planned:3.50, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-10', planned:3.50, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-11', planned:3.50, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-12', planned:4.00, actual:null, note:'ontbijt — prognose, zaterdag'},
+    {id:uid(), date:'2026-09-12', planned:4.50, actual:null, note:'banqueting — prognose, zaterdag'},
+    {id:uid(), date:'2026-09-20', planned:5.00, actual:null, note:'brunch — prognose, zondag'},
+    {id:uid(), date:'2026-09-21', planned:3.50, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-22', planned:3.50, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-23', planned:3.50, actual:null, note:'banqueting — prognose'},
+    {id:uid(), date:'2026-09-26', planned:9.50, actual:null, note:'banqueting — prognose, zaterdag'},
+    {id:uid(), date:'2026-09-30', planned:3.00, actual:null, note:'banqueting — prognose'}
+  ],
+  expenses: [
+    {id:uid(), date:'2026-09-15', amount:1500, desc:'Reis Aveiro (Portugal)', goal:'Aveiro / 70ste verjaardag'}
+  ],
+  settings: {goalName:'', goalAmount:0},
+  fiches: []
+};
+
+onSnapshot(boekRef, (snap)=>{
+  if(snap.exists() && snap.data() && (snap.data().shifts || snap.data().expenses)){
+    const d = snap.data();
+    data = {
+      shifts: d.shifts || [],
+      expenses: d.expenses || [],
+      settings: d.settings || {goalName:'',goalAmount:0},
+      fiches: d.fiches || []
+    };
+    render();
+  } else if(!snap.exists()){
+    setDoc(boekRef, SEED_DATA).then(()=>{ data = SEED_DATA; render(); }).catch(e=>console.error('seed mislukt', e));
+  } else {
+    render();
+  }
+}, (err)=> console.error('sync error', err));
+
+const today = new Date().toISOString().slice(0,10);
+$('#sDate').value = today;
+$('#eDate').value = today;
+</script>
+</body>
+</html>
