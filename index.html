@@ -176,7 +176,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
           <div class="form-grid full"><div><label for="sNote">Notitie (optioneel)</label><input type="text" id="sNote" placeholder="bv. banqueting, ontbijt..."></div></div>
           <button type="submit" class="btn">Dienst toevoegen</button>
         </form>
+        <p class="hint" style="margin-top:10px;"><button type="button" class="link-btn" onclick="importeerGeschiedenis()">Importeer volledige Strobbo-geschiedenis (mei–sept)</button> — vervangt alle huidige diensten door de geplande uren uit Strobbo, zonder effectieve uren.</p>
       </div>
+      <div class="card">
+        <h2>Maand afsluiten</h2>
+        <p class="hint" style="margin-top:-6px;margin-bottom:10px;">Voegt alle effectieve diensten van de gekozen maand samen tot één regel, zodat de lijst overzichtelijk blijft.</p>
+        <div class="form-grid">
+          <div><label for="closeMonth">Maand</label><input type="month" id="closeMonth"></div>
+          <div style="display:flex;align-items:flex-end;"><button type="button" class="btn brass" style="margin-top:0;" onclick="sluitMaandAf()">Samenvoegen</button></div>
+        </div>
+        <p class="hint">Enkel diensten met effectief ingevulde uren worden meegenomen; prognoses blijven apart staan tot ze effectief zijn.</p>
+      </div>
+
+      <div class="section-label">Afgesloten maanden</div>
+      <div id="maandList"></div>
+
       <div class="section-label">Overzicht diensten</div>
       <div id="shiftList"></div>
     </section>
@@ -237,7 +251,12 @@ const boekRef = doc(db, 'loonboek', 'danny');
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 
-let data = { shifts:[], expenses:[], settings:{goalName:'',goalAmount:0}, fiches:[] };
+let data = { shifts:[], expenses:[], settings:{goalName:'',goalAmount:0}, fiches:[], maandfiches:[] };
+const MAAND_NAMEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+function maandLabel(periode){
+  const [j,m] = periode.split('-');
+  return MAAND_NAMEN[parseInt(m,10)-1] + ' ' + j;
+}
 
 function opslaan(partial){
   Object.assign(data, partial);
@@ -325,6 +344,68 @@ window.verwijderFiche = function(i){
   opslaan({fiches});
 };
 
+window.sluitMaandAf = function(){
+  const periode = $('#closeMonth').value; // "YYYY-MM"
+  if(!periode){ alert('Kies eerst een maand.'); return; }
+  const teSluiten = data.shifts.filter(s => s.date.startsWith(periode) && s.actual !== null && s.actual !== undefined);
+  if(teSluiten.length === 0){ alert('Geen effectieve diensten gevonden in die maand.'); return; }
+  let uren = 0, bedrag = 0;
+  teSluiten.forEach(s => { uren += s.actual; bedrag += s.actual * rateFor(s.date); });
+  if(!confirm(`${teSluiten.length} diensten (${uren.toLocaleString('nl-BE',{maximumFractionDigits:2})}u, ${eur(bedrag)}) samenvoegen tot één maandregel voor ${maandLabel(periode)}? Dit kan niet ongedaan gemaakt worden.`)) return;
+  const overgebleven = data.shifts.filter(s => !(s.date.startsWith(periode) && s.actual !== null && s.actual !== undefined));
+  const maandfiches = [...(data.maandfiches||[]), {id:uid(), periode, label:maandLabel(periode), uren, bedrag, aantalDiensten:teSluiten.length}];
+  opslaan({shifts: overgebleven, maandfiches});
+};
+window.verwijderMaandfiche = function(id){
+  if(!confirm('Deze maandregel verwijderen? De onderliggende diensten komen NIET terug.')) return;
+  opslaan({maandfiches: (data.maandfiches||[]).filter(m=>m.id!==id)});
+};
+
+// ---- volledige Strobbo-geschiedenis (mei t/m september 2026), met effectieve uren waar al gekend ----
+const STROBBO_GESCHIEDENIS = [
+  {date:'2026-05-25', planned:4.5, actual:4.8833, note:'ontbijt — effectief 07:30-12:23'},
+  {date:'2026-06-13', planned:4.0, actual:4.10, note:'ontbijt — effectief 08:30-12:36'},
+  {date:'2026-06-16', planned:4.5, actual:5.25, note:'banqueting — effectief 16:45-22:00'},
+  {date:'2026-06-27', planned:3.0, actual:4.30, note:'ontbijt — effectief 07:45-12:03'},
+  {date:'2026-07-05', planned:8.0, actual:7.9333, note:'ontbijt + banqueting samengevoegd — effectief 09:00-17:11'},
+  {date:'2026-07-07', planned:8.0, actual:5.1833, note:'ontbijt — effectief 06:30-11:41'},
+  {date:'2026-07-12', planned:3.0, actual:3.0167, note:'ontbijt — effectief 09:00-12:01'},
+  {date:'2026-07-21', planned:4.0, actual:3.8333, note:'ontbijt — effectief 08:30-12:20'},
+  {date:'2026-07-23', planned:5.0, actual:3.5167, note:'banqueting — effectief 17:30-21:01'},
+  {date:'2026-07-27', planned:4.0, actual:3.4167, note:'ontbijt — effectief 09:00-12:25'},
+  {date:'2026-08-01', planned:4.0, actual:3.7333, note:'ontbijt — effectief 08:30-12:14'},
+  {date:'2026-08-02', planned:9.0, actual:8.0167, note:'ontbijt + banqueting samengevoegd — effectief 09:00-17:01'},
+  {date:'2026-08-06', planned:4.5, actual:4.00, note:'ontbijt — effectief 08:00-12:00'},
+  {date:'2026-08-08', planned:7.0, actual:5.5833, note:'banqueting — effectief 16:00-21:35'},
+  {date:'2026-08-09', planned:7.0, actual:6.6667, note:'banqueting — effectief 11:00-17:40'},
+  {date:'2026-08-16', planned:5.0, actual:4.95, note:'ontbijt — effectief 07:30-12:27'},
+  {date:'2026-08-23', planned:4.0, actual:3.7667, note:'ontbijt — effectief 08:30-12:16'},
+  {date:'2026-08-29', planned:4.0, actual:null, note:'ontbijt 08:30-12:30'},
+  {date:'2026-08-29', planned:7.5, actual:null, note:'banqueting 17:30-01:00'},
+  {date:'2026-08-30', planned:5.0, actual:null, note:'banqueting 12:00-17:00'},
+  {date:'2026-09-02', planned:5.0, actual:null, note:'banqueting 12:00-17:00'},
+  {date:'2026-09-03', planned:3.0, actual:null, note:'banqueting 11:00-14:00'},
+  {date:'2026-09-05', planned:4.0, actual:null, note:'ontbijt 08:30-12:30'},
+  {date:'2026-09-06', planned:3.5, actual:null, note:'ontbijt 08:30-12:00'},
+  {date:'2026-09-06', planned:5.0, actual:null, note:'banqueting 12:00-17:00'},
+  {date:'2026-09-09', planned:3.5, actual:null, note:'banqueting 11:00-14:30'},
+  {date:'2026-09-10', planned:3.5, actual:null, note:'banqueting 11:00-14:30'},
+  {date:'2026-09-11', planned:3.5, actual:null, note:'banqueting 11:00-14:30'},
+  {date:'2026-09-12', planned:4.0, actual:null, note:'ontbijt 07:30-11:30'},
+  {date:'2026-09-12', planned:4.5, actual:null, note:'banqueting 12:00-16:30'},
+  {date:'2026-09-20', planned:5.0, actual:null, note:'banqueting 12:00-17:00'},
+  {date:'2026-09-21', planned:3.5, actual:null, note:'banqueting 12:00-15:30'},
+  {date:'2026-09-22', planned:3.5, actual:null, note:'banqueting 17:30-21:00'},
+  {date:'2026-09-23', planned:3.5, actual:null, note:'banqueting 12:00-15:30'},
+  {date:'2026-09-26', planned:9.5, actual:null, note:'banqueting 14:00-23:30'},
+  {date:'2026-09-30', planned:3.0, actual:null, note:'banqueting 12:00-15:00'}
+];
+window.importeerGeschiedenis = function(){
+  if(!confirm('Dit vervangt ALLE huidige diensten door de volledige Strobbo-geschiedenis (mei t/m september), inclusief de al gekende effectieve uren tot 23/08. Doorgaan?')) return;
+  const shifts = STROBBO_GESCHIEDENIS.map(s => ({id:uid(), date:s.date, planned:s.planned, actual: (s.actual===undefined?null:s.actual), note:s.note}));
+  opslaan({shifts, maandfiches:[]});
+};
+
 // ---- loonfiche upload ----
 function compressImage(file, maxDim, quality){
   return new Promise((resolve, reject) => {
@@ -392,6 +473,7 @@ function computeTotals(){
       prognose += s.planned * rate; urenPrognose += s.planned;
     }
   });
+  (data.maandfiches||[]).forEach(m=>{ effectief += m.bedrag; urenEffectief += m.uren; });
   const totUitgaven = data.expenses.reduce((a,x)=>a+x.amount,0);
   return {effectief, prognose, urenEffectief, urenPrognose, totUitgaven};
 }
@@ -418,6 +500,22 @@ function render(){
       <p class="hint">${pct}% gedekt (incl. prognose) · <button class="link-btn" onclick="editGoal()">wijzig doel</button></p>`;
   } else {
     doelEl.innerHTML = `<p class="doel-empty">Nog geen spaardoel ingesteld.</p><button class="link-btn" onclick="editGoal()">+ spaardoel instellen</button>`;
+  }
+
+  const maandListEl = $('#maandList');
+  const maandfiches = data.maandfiches || [];
+  if(maandfiches.length===0){
+    maandListEl.innerHTML = `<div class="empty"><span class="icon">📦</span>Nog geen maanden samengevoegd.</div>`;
+  } else {
+    const sortedM = [...maandfiches].sort((a,b)=> b.periode.localeCompare(a.periode));
+    maandListEl.innerHTML = sortedM.map(m=>`
+      <div class="ticket">
+        <span class="stamp effectief" style="border-color:var(--brass-deep);color:var(--brass-deep);">Maandfiche</span>
+        <div class="ticket-top"><div class="ticket-date" style="text-transform:capitalize;">${esc(m.label)}</div></div>
+        <div class="ticket-meta"><span><b>${m.uren.toLocaleString('nl-BE',{maximumFractionDigits:2})}u</b></span><span>${m.aantalDiensten} diensten samengevoegd</span></div>
+        <div class="ticket-bedrag" style="margin-top:8px;">${eur(m.bedrag)}</div>
+        <div class="ticket-actions"><button class="del" onclick="verwijderMaandfiche('${m.id}')">verwijderen</button></div>
+      </div>`).join('');
   }
 
   const shiftListEl = $('#shiftList');
@@ -520,7 +618,8 @@ const SEED_DATA = {
     {id:uid(), date:'2026-09-15', amount:1500, desc:'Reis Aveiro (Portugal)', goal:'Aveiro / 70ste verjaardag'}
   ],
   settings: {goalName:'', goalAmount:0},
-  fiches: []
+  fiches: [],
+  maandfiches: []
 };
 
 onSnapshot(boekRef, (snap)=>{
@@ -530,7 +629,8 @@ onSnapshot(boekRef, (snap)=>{
       shifts: d.shifts || [],
       expenses: d.expenses || [],
       settings: d.settings || {goalName:'',goalAmount:0},
-      fiches: d.fiches || []
+      fiches: d.fiches || [],
+      maandfiches: d.maandfiches || []
     };
     render();
   } else if(!snap.exists()){
