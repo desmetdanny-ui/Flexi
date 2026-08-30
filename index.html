@@ -403,9 +403,9 @@ const STROBBO_GESCHIEDENIS = [
   {date:'2026-09-30', planned:3.0, actual:null, note:'banqueting 12:00-15:00'}
 ];
 window.importeerGeschiedenis = function(){
-  if(!confirm('Dit vervangt ALLE huidige diensten door de volledige Strobbo-geschiedenis (mei t/m september), inclusief de al gekende effectieve uren tot 23/08. Doorgaan?')) return;
+  if(!confirm('Dit vervangt alle diensten door de volledige Strobbo-geschiedenis (mei t/m september), inclusief de al gekende effectieve uren tot 23/08. Al afgesloten maanden en loonfiches blijven ongemoeid. Doorgaan?')) return;
   const shifts = STROBBO_GESCHIEDENIS.map(s => ({id:uid(), date:s.date, planned:s.planned, actual: (s.actual===undefined?null:s.actual), note:s.note}));
-  opslaan({shifts, maandfiches:[]});
+  opslaan({shifts});
 };
 
 // ---- loonfiche upload ----
