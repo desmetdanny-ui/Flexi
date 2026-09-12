@@ -158,6 +158,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
 
       <div class="card">
         <h2 id="maandTitel">Deze maand</h2>
+        <div class="form-grid full" style="margin-bottom:8px;"><div><label for="overzichtMaand">Bekijk maand</label><input type="month" id="overzichtMaand"></div></div>
         <div class="maand-grid">
           <div class="stat effectief"><p class="label">Effectief verdiend</p><p class="val" id="maandEffectief">€ 0,00</p></div>
           <div class="stat prognose"><p class="label">Nog gepland</p><p class="val" id="maandPrognose">€ 0,00</p></div>
@@ -277,6 +278,10 @@ function maandLabel(periode){
 function huidigeMaand(){
   const now = new Date();
   return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+}
+function gekozenMaand(){
+  const el = document.getElementById('overzichtMaand');
+  return (el && el.value) ? el.value : huidigeMaand();
 }
 
 function opslaan(partial){
@@ -507,7 +512,7 @@ function computeTotals(){
 }
 
 function computeMonthTotals(){
-  const ym = huidigeMaand();
+  const ym = gekozenMaand();
   let effUren=0, effBedrag=0, progUren=0, progBedrag=0;
   data.shifts.forEach(s=>{
     if(!s.date.startsWith(ym)) return;
@@ -538,7 +543,8 @@ function render(){
 
   const mt = computeMonthTotals();
   const maandLabelCap = maandLabel(mt.ym);
-  $('#maandTitel').textContent = 'Deze maand — ' + maandLabelCap.charAt(0).toUpperCase() + maandLabelCap.slice(1);
+  const isHuidig = mt.ym === huidigeMaand();
+  $('#maandTitel').textContent = (isHuidig ? 'Deze maand' : 'Prognose') + ' — ' + maandLabelCap.charAt(0).toUpperCase() + maandLabelCap.slice(1);
   $('#maandEffectief').textContent = eur(mt.effBedrag);
   $('#maandPrognose').textContent = eur(mt.progBedrag);
   $('#maandUrenTekst').textContent = mt.effUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u effectief gewerkt · ' + mt.progUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u nog gepland';
@@ -712,6 +718,8 @@ onSnapshot(boekRef, (snap)=>{
 const today = new Date().toISOString().slice(0,10);
 $('#sDate').value = today;
 $('#eDate').value = today;
+$('#overzichtMaand').value = huidigeMaand();
+$('#overzichtMaand').addEventListener('change', render);
 </script>
 </body>
 </html>
