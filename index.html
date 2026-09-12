@@ -164,6 +164,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
         </div>
         <p class="hint" id="maandUrenTekst">0u effectief gewerkt · 0u nog gepland</p>
         <p class="maand-totaal" id="maandTotaal">Totaal mogelijk deze maand: € 0,00</p>
+        <div id="maandDoelInhoud" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);"></div>
       </div>
 
       <div class="card doel-box" id="doelKaart">
@@ -351,6 +352,13 @@ window.quickToggleActual = function(id){
   }
   opslaan({shifts: updated});
 };
+window.editMaandDoel = function(){
+  const huidig = (data.settings||{}).maandDoel || '';
+  const amountRaw = prompt('Maanddoel in € (bv. 750). Laat leeg om het doel te verwijderen.', huidig);
+  if(amountRaw === null) return;
+  const val = amountRaw.trim() === '' ? 0 : (parseFloat(amountRaw.replace(',','.'))||0);
+  opslaan({settings: {...data.settings, maandDoel: val}});
+};
 window.editGoal = function(){
   const name = prompt('Naam van het spaardoel (bv. "70ste verjaardag" of "Reis Portugal")', data.settings.goalName||'');
   if(name === null) return;
@@ -536,6 +544,21 @@ function render(){
   $('#maandUrenTekst').textContent = mt.effUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u effectief gewerkt · ' + mt.progUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u nog gepland';
   $('#maandTotaal').textContent = 'Totaal mogelijk deze maand: ' + eur(mt.effBedrag + mt.progBedrag);
 
+  const maandDoelEl = $('#maandDoelInhoud');
+  const maandDoel = (data.settings||{}).maandDoel || 0;
+  const totaalMaand = mt.effBedrag + mt.progBedrag;
+  if(maandDoel > 0){
+    const verschil = maandDoel - totaalMaand;
+    if(verschil <= 0){
+      maandDoelEl.innerHTML = `<p class="hint">Maanddoel van ${eur(maandDoel)} gehaald — ${eur(-verschil)} extra. <button class="link-btn" onclick="editMaandDoel()">wijzig doel</button></p>`;
+    } else {
+      const urenNodig = verschil / 14;
+      maandDoelEl.innerHTML = `<p class="hint">Nog <b>${eur(verschil)}</b> nodig voor je maanddoel van ${eur(maandDoel)} — ongeveer <b>${urenNodig.toLocaleString('nl-BE',{maximumFractionDigits:1})}u</b> extra aan te nemen. <button class="link-btn" onclick="editMaandDoel()">wijzig doel</button></p>`;
+    }
+  } else {
+    maandDoelEl.innerHTML = `<button class="link-btn" onclick="editMaandDoel()">+ maanddoel instellen</button>`;
+  }
+
   const doelEl = $('#doelInhoud');
   const settings = data.settings || {};
   if(settings.goalName && settings.goalAmount>0){
@@ -663,7 +686,7 @@ const SEED_DATA = {
   expenses: [
     {id:uid(), date:'2026-09-15', amount:1500, desc:'Reis Aveiro (Portugal)', goal:'Aveiro / 70ste verjaardag'}
   ],
-  settings: {goalName:'', goalAmount:0},
+  settings: {goalName:'', goalAmount:0, maandDoel:0},
   fiches: [],
   maandfiches: []
 };
