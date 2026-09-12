@@ -62,6 +62,10 @@ main{padding:20px 16px 8px;}
 .stat.uitgaven .val{color:var(--wine);}
 .stat.uren .val{color:var(--ink);}
 
+.maand-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;background:var(--paper-2);border:1px solid var(--rule);border-radius:8px;padding:6px 6px;}
+.maand-nav button{background:var(--brass-deep);color:#fff;border:none;border-radius:6px;width:36px;height:36px;font-size:18px;font-weight:700;cursor:pointer;flex-shrink:0;}
+.maand-nav button:active{transform:translateY(1px);}
+.maand-nav .maand-nav-label{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13.5px;text-transform:capitalize;color:var(--ink);text-align:center;flex:1;}
 .maand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
 .maand-grid .stat{margin-bottom:0;}
 .maand-totaal{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:16px;color:var(--ink);margin:2px 0 0;}
@@ -158,7 +162,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
 
       <div class="card">
         <h2 id="maandTitel">Deze maand</h2>
-        <div class="form-grid full" style="margin-bottom:8px;"><div><label for="overzichtMaand">Bekijk maand</label><input type="month" id="overzichtMaand"></div></div>
+        <div class="form-grid full" style="margin-bottom:8px;"><div><label for="overzichtMaand">Bekijk maand</label><input type="month" id="overzichtMaand" style="display:none;"></div></div>
+        <div class="maand-nav">
+          <button type="button" onclick="wijzigMaand(-1)">‹</button>
+          <span class="maand-nav-label" id="maandNavLabel">September 2026</span>
+          <button type="button" onclick="wijzigMaand(1)">›</button>
+        </div>
         <div class="maand-grid">
           <div class="stat effectief"><p class="label">Effectief verdiend</p><p class="val" id="maandEffectief">€ 0,00</p></div>
           <div class="stat prognose"><p class="label">Nog gepland</p><p class="val" id="maandPrognose">€ 0,00</p></div>
@@ -283,6 +292,13 @@ function gekozenMaand(){
   const el = document.getElementById('overzichtMaand');
   return (el && el.value) ? el.value : huidigeMaand();
 }
+window.wijzigMaand = function(delta){
+  const [j,m] = gekozenMaand().split('-').map(Number);
+  const d = new Date(j, (m-1) + delta, 1);
+  const nieuw = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  $('#overzichtMaand').value = nieuw;
+  render();
+};
 
 function opslaan(partial){
   Object.assign(data, partial);
@@ -545,6 +561,7 @@ function render(){
   const maandLabelCap = maandLabel(mt.ym);
   const isHuidig = mt.ym === huidigeMaand();
   $('#maandTitel').textContent = (isHuidig ? 'Deze maand' : 'Prognose') + ' — ' + maandLabelCap.charAt(0).toUpperCase() + maandLabelCap.slice(1);
+  $('#maandNavLabel').textContent = maandLabelCap.charAt(0).toUpperCase() + maandLabelCap.slice(1);
   $('#maandEffectief').textContent = eur(mt.effBedrag);
   $('#maandPrognose').textContent = eur(mt.progBedrag);
   $('#maandUrenTekst').textContent = mt.effUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u effectief gewerkt · ' + mt.progUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u nog gepland';
