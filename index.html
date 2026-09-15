@@ -353,6 +353,22 @@ $('#expenseForm').addEventListener('submit', (e)=>{
   $('#eDate').value = new Date().toISOString().slice(0,10);
 });
 
+window.editShift = function(id){
+  const s = data.shifts.find(x=>x.id===id);
+  if(!s) return;
+  const dateRaw = prompt('Datum (YYYY-MM-DD):', s.date);
+  if(dateRaw===null) return;
+  const plannedRaw = prompt('Geplande uren:', s.planned);
+  if(plannedRaw===null) return;
+  const actualRaw = prompt('Effectief gewerkte uren (leeg = prognose):', (s.actual!==null && s.actual!==undefined) ? s.actual : '');
+  if(actualRaw===null) return;
+  const noteRaw = prompt('Notitie:', s.note||'');
+  if(noteRaw===null) return;
+  const planned = parseFloat(String(plannedRaw).replace(',','.'))||0;
+  const actual = actualRaw.trim()==='' ? null : (parseFloat(String(actualRaw).replace(',','.'))||0);
+  const updated = data.shifts.map(x=> x.id===id ? {...x, date:dateRaw.trim(), planned, actual, note:noteRaw.trim()} : x);
+  opslaan({shifts: updated});
+};
 window.deleteShift = function(id){
   opslaan({shifts: data.shifts.filter(s=>s.id!==id)});
 };
@@ -628,6 +644,7 @@ function render(){
         ${s.note ? `<p class="hint" style="margin-top:6px;">${esc(s.note)}</p>` : ''}
         <div class="ticket-bedrag" style="margin-top:8px;">${eur(bedrag)}</div>
         <div class="ticket-actions">
+          <button onclick="editShift('${s.id}')">bewerken</button>
           <button onclick="quickToggleActual('${s.id}')">${isEff?'zet terug op prognose':'markeer als effectief'}</button>
           <button class="del" onclick="deleteShift('${s.id}')">verwijderen</button>
         </div>
