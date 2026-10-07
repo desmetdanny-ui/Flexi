@@ -331,17 +331,27 @@ function syncStrobbo(){
   if(!dataGeladen || !strobboFeed) return;
   const vandaag = vandaagLokaal();
   const feedIds = new Set(strobboFeed.map(f=>f.strobboId));
+  const toekomst = strobboFeed.filter(f=>f.date >= vandaag);
+  const geslotenMaanden = new Set((data.maandfiches||[]).map(m=>m.periode));
   let shifts = data.shifts.map(s=>({...s}));
+
+  // oude Strobbo-prognoses die dubbel staan opruimen (dag al effectief ingevuld of maand afgesloten)
+  shifts = shifts.filter(s=>{
+    if(!s.strobboId || isEffectief(s) || s.date >= vandaag) return true;
+    if(geslotenMaanden.has(s.date.slice(0,7))) return false;
+    return !shifts.some(x=>x!==s && x.date===s.date && isEffectief(x));
+  });
 
   // toekomstige Strobbo-diensten die uit de agenda verdwenen zijn (geannuleerd) weghalen
   shifts = shifts.filter(s => !(s.strobboId && !feedIds.has(s.strobboId) && s.date > vandaag && !isEffectief(s)));
 
-  strobboFeed.forEach(f=>{
+  // enkel diensten vanaf vandaag overnemen; het verleden blijft zoals je het zelf invulde
+  toekomst.forEach(f=>{
     let s = shifts.find(x=>x.strobboId===f.strobboId);
     if(!s){
       // zelf ingevoerde dienst op dezelfde dag koppelen in plaats van dubbel toe te voegen
       const kandidaten = shifts.filter(x=>!x.strobboId && x.date===f.date && !isEffectief(x));
-      const zelfdeDagInFeed = strobboFeed.filter(y=>y.date===f.date).length;
+      const zelfdeDagInFeed = toekomst.filter(y=>y.date===f.date).length;
       s = kandidaten.find(x=>Math.abs((x.planned||0)-f.planned)<0.01)
         || (kandidaten.length===1 && zelfdeDagInFeed===1 ? kandidaten[0] : null);
       if(s) s.strobboId = f.strobboId;
@@ -655,7 +665,7 @@ function render(){
   const statusEl = $('#strobboStatus');
   if(statusEl && strobboBijgewerkt){
     const d = new Date(strobboBijgewerkt);
-    statusEl.textContent = 'Strobbo-koppeling: laatst opgehaald ' + d.toLocaleString('nl-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + ' · ' + (strobboFeed ? strobboFeed.length : 0) + ' geplande diensten.';
+    statusEl.textContent = 'Strobbo-koppeling: laatst opgehaald ' + d.toLocaleString('nl-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + ' · ' + (strobboFeed ? strobboFeed.filter(f=>f.date >= vandaagLokaal()).length : 0) + ' komende diensten.';
   }
 
   const maandListEl = $('#maandList');
