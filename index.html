@@ -203,6 +203,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
           <button type="submit" class="btn">Dienst toevoegen</button>
         </form>
         <p class="hint" style="margin-top:10px;"><button type="button" class="link-btn" onclick="importeerGeschiedenis()">Importeer volledige Strobbo-geschiedenis (mei–sept)</button> — vervangt alle huidige diensten door de geplande (en gekende effectieve) uren uit Strobbo.</p>
+        <p class="hint" id="strobboStatus" style="margin-top:8px;">Strobbo-koppeling: nog geen gegevens ontvangen.</p>
       </div>
       <div class="section-label">Overzicht diensten</div>
       <div id="shiftList"></div>
@@ -274,11 +275,16 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const storage = getStorage(fbApp);
 const boekRef = doc(db, 'loonboek', 'danny');
+const strobboRef = doc(db, 'loonboek', 'strobbo');
 
 const $ = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 
 let data = { shifts:[], expenses:[], settings:{goalName:'',goalAmount:0}, fiches:[], maandfiches:[] };
+let dataGeladen = false;
+let strobboFeed = null;
+let strobboBijgewerkt = '';
+
 const MAAND_NAMEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
 function maandLabel(periode){
   const [j,m] = periode.split('-');
@@ -287,6 +293,10 @@ function maandLabel(periode){
 function huidigeMaand(){
   const now = new Date();
   return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+}
+function vandaagLokaal(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 function gekozenMaand(){
   const el = document.getElementById('overzichtMaand');
@@ -314,6 +324,38 @@ function eur(n){ return '€ ' + (n||0).toLocaleString('nl-BE', {minimumFraction
 function dayLabel(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {weekday:'short'}).replace('.',''); }
 function fmtDate(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {day:'2-digit', month:'short', year:'numeric'}); }
 function esc(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+// ---- Strobbo-koppeling: geplande diensten automatisch overnemen ----
+function isEffectief(s){ return s.actual !== null && s.actual !== undefined; }
+function syncStrobbo(){
+  if(!dataGeladen || !strobboFeed) return;
+  const vandaag = vandaagLokaal();
+  const feedIds = new Set(strobboFeed.map(f=>f.strobboId));
+  let shifts = data.shifts.map(s=>({...s}));
+
+  // toekomstige Strobbo-diensten die uit de agenda verdwenen zijn (geannuleerd) weghalen
+  shifts = shifts.filter(s => !(s.strobboId && !feedIds.has(s.strobboId) && s.date > vandaag && !isEffectief(s)));
+
+  strobboFeed.forEach(f=>{
+    let s = shifts.find(x=>x.strobboId===f.strobboId);
+    if(!s){
+      // zelf ingevoerde dienst op dezelfde dag koppelen in plaats van dubbel toe te voegen
+      const kandidaten = shifts.filter(x=>!x.strobboId && x.date===f.date && !isEffectief(x));
+      const zelfdeDagInFeed = strobboFeed.filter(y=>y.date===f.date).length;
+      s = kandidaten.find(x=>Math.abs((x.planned||0)-f.planned)<0.01)
+        || (kandidaten.length===1 && zelfdeDagInFeed===1 ? kandidaten[0] : null);
+      if(s) s.strobboId = f.strobboId;
+    }
+    if(s){
+      s.date = f.date; s.planned = f.planned; s.note = f.note;
+    } else {
+      shifts.push({id:uid(), strobboId:f.strobboId, date:f.date, planned:f.planned, actual:null, note:f.note});
+    }
+  });
+
+  if(JSON.stringify(shifts) !== JSON.stringify(data.shifts)) opslaan({shifts});
+  render();
+}
 
 // tabs
 $$('.tabs button').forEach(btn=>{
@@ -610,6 +652,12 @@ function render(){
     doelEl.innerHTML = `<p class="doel-empty">Nog geen spaardoel ingesteld.</p><button class="link-btn" onclick="editGoal()">+ spaardoel instellen</button>`;
   }
 
+  const statusEl = $('#strobboStatus');
+  if(statusEl && strobboBijgewerkt){
+    const d = new Date(strobboBijgewerkt);
+    statusEl.textContent = 'Strobbo-koppeling: laatst opgehaald ' + d.toLocaleString('nl-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) + ' · ' + (strobboFeed ? strobboFeed.length : 0) + ' geplande diensten.';
+  }
+
   const maandListEl = $('#maandList');
   const maandfiches = data.maandfiches || [];
   if(maandfiches.length===0){
@@ -741,13 +789,24 @@ onSnapshot(boekRef, (snap)=>{
       fiches: d.fiches || [],
       maandfiches: d.maandfiches || []
     };
+    dataGeladen = true;
     render();
+    syncStrobbo();
   } else if(!snap.exists()){
-    setDoc(boekRef, SEED_DATA).then(()=>{ data = SEED_DATA; render(); }).catch(e=>console.error('seed mislukt', e));
+    setDoc(boekRef, SEED_DATA).then(()=>{ data = SEED_DATA; dataGeladen = true; render(); syncStrobbo(); }).catch(e=>console.error('seed mislukt', e));
   } else {
+    dataGeladen = true;
     render();
   }
 }, (err)=> console.error('sync error', err));
+
+onSnapshot(strobboRef, (snap)=>{
+  if(!snap.exists()) return;
+  const d = snap.data() || {};
+  try{ strobboFeed = JSON.parse(d.json || '[]'); }catch(e){ console.error('Strobbo-gegevens onleesbaar', e); return; }
+  strobboBijgewerkt = d.bijgewerkt || '';
+  syncStrobbo();
+}, (err)=> console.error('strobbo sync error', err));
 
 const today = new Date().toISOString().slice(0,10);
 $('#sDate').value = today;
