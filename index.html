@@ -172,6 +172,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
           <div class="stat effectief"><p class="label">Effectief verdiend</p><p class="val" id="maandEffectief">€ 0,00</p></div>
           <div class="stat prognose"><p class="label">Nog gepland</p><p class="val" id="maandPrognose">€ 0,00</p></div>
         </div>
+        <div class="stat uren" style="margin-bottom:10px;">
+          <p class="label">Geplande uren deze maand (vergelijk met Strobbo)</p>
+          <p class="val" id="maandGepland">0 u</p>
+          <p class="hint" id="maandGeplandSub" style="margin:4px 0 0;"></p>
+        </div>
         <p class="hint" id="maandUrenTekst">0u effectief gewerkt · 0u nog gepland</p>
         <p class="maand-totaal" id="maandTotaal">Totaal mogelijk deze maand: € 0,00</p>
         <div id="maandDoelInhoud" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);"></div>
@@ -321,6 +326,7 @@ function opslaan(partial){
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function rateFor(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.getDay()===0 ? 16 : 14; }
 function eur(n){ return '€ ' + (n||0).toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function urenFmt(n){ return (n||0).toLocaleString('nl-BE',{maximumFractionDigits:2}); }
 function dayLabel(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {weekday:'short'}).replace('.',''); }
 function fmtDate(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {day:'2-digit', month:'short', year:'numeric'}); }
 function esc(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -466,11 +472,11 @@ window.sluitMaandAf = function(){
   if(!periode){ alert('Kies eerst een maand.'); return; }
   const teSluiten = data.shifts.filter(s => s.date.startsWith(periode) && s.actual !== null && s.actual !== undefined);
   if(teSluiten.length === 0){ alert('Geen effectieve diensten gevonden in die maand.'); return; }
-  let uren = 0, bedrag = 0;
-  teSluiten.forEach(s => { uren += s.actual; bedrag += s.actual * rateFor(s.date); });
-  if(!confirm(`${teSluiten.length} diensten (${uren.toLocaleString('nl-BE',{maximumFractionDigits:2})}u, ${eur(bedrag)}) samenvoegen tot één maandregel voor ${maandLabel(periode)}? Dit kan niet ongedaan gemaakt worden.`)) return;
+  let uren = 0, bedrag = 0, geplandUren = 0;
+  teSluiten.forEach(s => { uren += s.actual; bedrag += s.actual * rateFor(s.date); geplandUren += (s.planned||0); });
+  if(!confirm(`${teSluiten.length} diensten (${urenFmt(uren)}u, ${eur(bedrag)}) samenvoegen tot één maandregel voor ${maandLabel(periode)}? Dit kan niet ongedaan gemaakt worden.`)) return;
   const overgebleven = data.shifts.filter(s => !(s.date.startsWith(periode) && s.actual !== null && s.actual !== undefined));
-  const maandfiches = [...(data.maandfiches||[]), {id:uid(), periode, label:maandLabel(periode), uren, bedrag, aantalDiensten:teSluiten.length}];
+  const maandfiches = [...(data.maandfiches||[]), {id:uid(), periode, label:maandLabel(periode), uren, geplandUren, bedrag, aantalDiensten:teSluiten.length}];
   opslaan({shifts: overgebleven, maandfiches});
 };
 window.verwijderMaandfiche = function(id){
@@ -598,9 +604,11 @@ function computeTotals(){
 function computeMonthTotals(){
   const ym = gekozenMaand();
   let effUren=0, effBedrag=0, progUren=0, progBedrag=0;
+  let geplandUren=0, aantalDiensten=0, geslotenZonderPlan=false;
   data.shifts.forEach(s=>{
     if(!s.date.startsWith(ym)) return;
     const rate = rateFor(s.date);
+    geplandUren += (s.planned||0); aantalDiensten++;
     if(s.actual !== null && s.actual !== undefined){
       effUren += s.actual; effBedrag += s.actual*rate;
     } else {
@@ -608,9 +616,14 @@ function computeMonthTotals(){
     }
   });
   (data.maandfiches||[]).forEach(m=>{
-    if(m.periode === ym){ effUren += m.uren; effBedrag += m.bedrag; }
+    if(m.periode === ym){
+      effUren += m.uren; effBedrag += m.bedrag;
+      aantalDiensten += (m.aantalDiensten||0);
+      if(m.geplandUren !== undefined && m.geplandUren !== null) geplandUren += m.geplandUren;
+      else geslotenZonderPlan = true;
+    }
   });
-  return {ym, effUren, effBedrag, progUren, progBedrag};
+  return {ym, effUren, effBedrag, progUren, progBedrag, geplandUren, aantalDiensten, geslotenZonderPlan};
 }
 
 function render(){
@@ -623,7 +636,7 @@ function render(){
   $('#statEffectief').textContent = eur(t.effectief);
   $('#statPrognose').textContent = eur(t.prognose);
   $('#statUitgaven').textContent = eur(t.totUitgaven);
-  $('#statUren').textContent = (t.urenEffectief + t.urenPrognose).toLocaleString('nl-BE',{maximumFractionDigits:2}) + ' u';
+  $('#statUren').textContent = urenFmt(t.urenEffectief + t.urenPrognose) + ' u';
 
   const mt = computeMonthTotals();
   const maandLabelCap = maandLabel(mt.ym);
@@ -632,7 +645,10 @@ function render(){
   $('#maandNavLabel').textContent = maandLabelCap.charAt(0).toUpperCase() + maandLabelCap.slice(1);
   $('#maandEffectief').textContent = eur(mt.effBedrag);
   $('#maandPrognose').textContent = eur(mt.progBedrag);
-  $('#maandUrenTekst').textContent = mt.effUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u effectief gewerkt · ' + mt.progUren.toLocaleString('nl-BE',{maximumFractionDigits:2}) + 'u nog gepland';
+  $('#maandGepland').textContent = urenFmt(mt.geplandUren) + ' u';
+  $('#maandGeplandSub').textContent = mt.aantalDiensten + (mt.aantalDiensten===1 ? ' dienst' : ' diensten')
+    + (mt.geslotenZonderPlan ? ' · let op: maand werd afgesloten vóór deze functie, geplande uren daarvan niet bewaard' : '');
+  $('#maandUrenTekst').textContent = urenFmt(mt.effUren) + 'u effectief gewerkt · ' + urenFmt(mt.progUren) + 'u nog gepland';
   $('#maandTotaal').textContent = 'Totaal mogelijk deze maand: ' + eur(mt.effBedrag + mt.progBedrag);
 
   const maandDoelEl = $('#maandDoelInhoud');
@@ -678,7 +694,11 @@ function render(){
       <div class="ticket">
         <span class="stamp effectief" style="border-color:var(--brass-deep);color:var(--brass-deep);">Maandfiche</span>
         <div class="ticket-top"><div class="ticket-date" style="text-transform:capitalize;">${esc(m.label)}</div></div>
-        <div class="ticket-meta"><span><b>${m.uren.toLocaleString('nl-BE',{maximumFractionDigits:2})}u</b></span><span>${m.aantalDiensten} diensten samengevoegd</span></div>
+        <div class="ticket-meta">
+          ${(m.geplandUren!==undefined && m.geplandUren!==null) ? `<span>Gepland <b>${urenFmt(m.geplandUren)}u</b></span>` : ''}
+          <span>Effectief <b>${urenFmt(m.uren)}u</b></span>
+          <span>${m.aantalDiensten} diensten samengevoegd</span>
+        </div>
         <div class="ticket-bedrag" style="margin-top:8px;">${eur(m.bedrag)}</div>
         <div class="ticket-actions"><button class="del" onclick="verwijderMaandfiche('${m.id}')">verwijderen</button></div>
       </div>`).join('');
