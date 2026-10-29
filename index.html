@@ -157,7 +157,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
         <div class="stat effectief"><p class="label">Effectief verdiend</p><p class="val" id="statEffectief">€ 0,00</p></div>
         <div class="stat prognose"><p class="label">Nog te verwachten</p><p class="val" id="statPrognose">€ 0,00</p></div>
         <div class="stat uitgaven"><p class="label">Uitgaven</p><p class="val" id="statUitgaven">€ 0,00</p></div>
-        <div class="stat uren"><p class="label">Uren dit overzicht</p><p class="val" id="statUren">0 u</p></div>
+        <div class="stat uren"><p class="label">Uren dit overzicht</p><p class="val" id="statUren">0:00</p></div>
       </div>
 
       <div class="card">
@@ -174,7 +174,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
         </div>
         <div class="stat uren" style="margin-bottom:10px;">
           <p class="label">Geplande uren deze maand (vergelijk met Strobbo)</p>
-          <p class="val" id="maandGepland">0 u</p>
+          <p class="val" id="maandGepland">0:00</p>
           <p class="hint" id="maandGeplandSub" style="margin:4px 0 0;"></p>
         </div>
         <p class="hint" id="maandUrenTekst">0u effectief gewerkt · 0u nog gepland</p>
@@ -201,9 +201,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--brass);outline-o
         <form id="shiftForm">
           <div class="form-grid full"><div><label for="sDate">Datum</label><input type="date" id="sDate" required></div></div>
           <div class="form-grid">
-            <div><label for="sPlanned">Geplande uren</label><input type="number" id="sPlanned" step="0.01" min="0" placeholder="bv. 3,5" required></div>
-            <div><label for="sActual">Effectief (optioneel)</label><input type="number" id="sActual" step="0.01" min="0" placeholder="leeg = prognose"></div>
+            <div><label for="sPlanned">Geplande uren</label><input type="text" id="sPlanned" inputmode="text" autocomplete="off" placeholder="bv. 3:30" required></div>
+            <div><label for="sActual">Effectief (optioneel)</label><input type="text" id="sActual" inputmode="text" autocomplete="off" placeholder="bv. 4:46"></div>
           </div>
+          <p class="hint" style="margin:-4px 2px 10px;">Typ uren zoals Strobbo ze toont: 4:46 is 4 uur en 46 minuten. Decimaal mag ook met komma (4,5).</p>
           <div class="form-grid full"><div><label for="sNote">Notitie (optioneel)</label><input type="text" id="sNote" placeholder="bv. banqueting, ontbijt..."></div></div>
           <button type="submit" class="btn">Dienst toevoegen</button>
         </form>
@@ -326,7 +327,26 @@ function opslaan(partial){
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function rateFor(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.getDay()===0 ? 16 : 14; }
 function eur(n){ return '€ ' + (n||0).toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function urenFmt(n){ return (n||0).toLocaleString('nl-BE',{maximumFractionDigits:2}); }
+// uren altijd tonen als u:mm, net zoals Strobbo (6,8167 → 6:49)
+function urenFmt(n){
+  const totMin = Math.round((n||0) * 60);
+  const u = Math.floor(totMin / 60), m = totMin % 60;
+  return u + ':' + String(m).padStart(2,'0');
+}
+// invoer lezen: "6:49", "6u49", "6.49u"? → enkel ":" of "u" betekent minuten; "6,5" of "6.5" is decimaal
+function parseUren(raw){
+  if(raw === null || raw === undefined) return null;
+  const s = String(raw).trim().toLowerCase().replace(/\s+/g,'');
+  if(s === '') return null;
+  const hm = s.match(/^(\d{1,2})[:u](\d{1,2})$/);
+  if(hm){
+    const m = parseInt(hm[2],10);
+    if(m > 59) return NaN;
+    return parseInt(hm[1],10) + m/60;
+  }
+  const v = parseFloat(s.replace(/u$/,'').replace(',','.'));
+  return isNaN(v) ? NaN : v;
+}
 function dayLabel(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {weekday:'short'}).replace('.',''); }
 function fmtDate(dateStr){ const d = new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('nl-BE', {day:'2-digit', month:'short', year:'numeric'}); }
 function esc(s){ return (s||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
@@ -387,11 +407,11 @@ $$('.tabs button').forEach(btn=>{
 $('#shiftForm').addEventListener('submit', (e)=>{
   e.preventDefault();
   const date = $('#sDate').value;
-  const planned = parseFloat($('#sPlanned').value)||0;
-  const actualRaw = $('#sActual').value;
-  const actual = actualRaw === '' ? null : parseFloat(actualRaw);
+  const planned = parseUren($('#sPlanned').value);
+  const actual = parseUren($('#sActual').value);
   const note = $('#sNote').value.trim();
-  if(!date || planned<=0) return;
+  if(!date || !(planned>0)){ alert('Geplande uren niet herkend. Typ bv. 3:30 of 3,5.'); return; }
+  if(Number.isNaN(actual)){ alert('Effectieve uren niet herkend. Typ bv. 4:46.'); return; }
   const shifts = [...data.shifts, {id:uid(), date, planned, actual, note}];
   opslaan({shifts});
   e.target.reset();
@@ -416,14 +436,15 @@ window.editShift = function(id){
   if(!s) return;
   const dateRaw = prompt('Datum (YYYY-MM-DD):', s.date);
   if(dateRaw===null) return;
-  const plannedRaw = prompt('Geplande uren:', s.planned);
+  const plannedRaw = prompt('Geplande uren (bv. 3:30):', urenFmt(s.planned));
   if(plannedRaw===null) return;
-  const actualRaw = prompt('Effectief gewerkte uren (leeg = prognose):', (s.actual!==null && s.actual!==undefined) ? s.actual : '');
+  const actualRaw = prompt('Effectief gewerkte uren, zoals in Strobbo (bv. 4:46). Leeg = prognose:', (s.actual!==null && s.actual!==undefined) ? urenFmt(s.actual) : '');
   if(actualRaw===null) return;
   const noteRaw = prompt('Notitie:', s.note||'');
   if(noteRaw===null) return;
-  const planned = parseFloat(String(plannedRaw).replace(',','.'))||0;
-  const actual = actualRaw.trim()==='' ? null : (parseFloat(String(actualRaw).replace(',','.'))||0);
+  const planned = parseUren(plannedRaw);
+  const actual = parseUren(actualRaw);
+  if(!(planned>0) || Number.isNaN(actual)){ alert('Uren niet herkend. Typ bv. 4:46 of 4,5.'); return; }
   const updated = data.shifts.map(x=> x.id===id ? {...x, date:dateRaw.trim(), planned, actual, note:noteRaw.trim()} : x);
   opslaan({shifts: updated});
 };
@@ -440,9 +461,10 @@ window.quickToggleActual = function(id){
   if(s.actual !== null && s.actual !== undefined){
     updated = data.shifts.map(x=> x.id===id ? {...x, actual:null} : x);
   } else {
-    const v = prompt('Effectief gewerkte uren voor '+fmtDate(s.date)+':', s.planned);
+    const v = prompt('Effectief gewerkte uren voor '+fmtDate(s.date)+', zoals in Strobbo (bv. 4:46):', '');
     if(v===null) return;
-    const val = parseFloat(v.replace(',','.'))||0;
+    const val = parseUren(v);
+    if(!(val>0)){ alert('Uren niet herkend. Typ bv. 4:46 of 4,5.'); return; }
     updated = data.shifts.map(x=> x.id===id ? {...x, actual:val} : x);
   }
   opslaan({shifts: updated});
@@ -474,7 +496,7 @@ window.sluitMaandAf = function(){
   if(teSluiten.length === 0){ alert('Geen effectieve diensten gevonden in die maand.'); return; }
   let uren = 0, bedrag = 0, geplandUren = 0;
   teSluiten.forEach(s => { uren += s.actual; bedrag += s.actual * rateFor(s.date); geplandUren += (s.planned||0); });
-  if(!confirm(`${teSluiten.length} diensten (${urenFmt(uren)}u, ${eur(bedrag)}) samenvoegen tot één maandregel voor ${maandLabel(periode)}? Dit kan niet ongedaan gemaakt worden.`)) return;
+  if(!confirm(`${teSluiten.length} diensten (${urenFmt(uren)} uur, ${eur(bedrag)}) samenvoegen tot één maandregel voor ${maandLabel(periode)}? Dit kan niet ongedaan gemaakt worden.`)) return;
   const overgebleven = data.shifts.filter(s => !(s.date.startsWith(periode) && s.actual !== null && s.actual !== undefined));
   const maandfiches = [...(data.maandfiches||[]), {id:uid(), periode, label:maandLabel(periode), uren, geplandUren, bedrag, aantalDiensten:teSluiten.length}];
   opslaan({shifts: overgebleven, maandfiches});
@@ -636,7 +658,7 @@ function render(){
   $('#statEffectief').textContent = eur(t.effectief);
   $('#statPrognose').textContent = eur(t.prognose);
   $('#statUitgaven').textContent = eur(t.totUitgaven);
-  $('#statUren').textContent = urenFmt(t.urenEffectief + t.urenPrognose) + ' u';
+  $('#statUren').textContent = urenFmt(t.urenEffectief + t.urenPrognose);
 
   const mt = computeMonthTotals();
   const maandLabelCap = maandLabel(mt.ym);
@@ -645,10 +667,10 @@ function render(){
   $('#maandNavLabel').textContent = maandLabelCap.charAt(0).toUpperCase() + maandLabelCap.slice(1);
   $('#maandEffectief').textContent = eur(mt.effBedrag);
   $('#maandPrognose').textContent = eur(mt.progBedrag);
-  $('#maandGepland').textContent = urenFmt(mt.geplandUren) + ' u';
+  $('#maandGepland').textContent = urenFmt(mt.geplandUren);
   $('#maandGeplandSub').textContent = mt.aantalDiensten + (mt.aantalDiensten===1 ? ' dienst' : ' diensten')
     + (mt.geslotenZonderPlan ? ' · let op: maand werd afgesloten vóór deze functie, geplande uren daarvan niet bewaard' : '');
-  $('#maandUrenTekst').textContent = urenFmt(mt.effUren) + 'u effectief gewerkt · ' + urenFmt(mt.progUren) + 'u nog gepland';
+  $('#maandUrenTekst').textContent = urenFmt(mt.effUren) + ' effectief gewerkt · ' + urenFmt(mt.progUren) + ' nog gepland';
   $('#maandTotaal').textContent = 'Totaal mogelijk deze maand: ' + eur(mt.effBedrag + mt.progBedrag);
 
   const maandDoelEl = $('#maandDoelInhoud');
@@ -695,8 +717,8 @@ function render(){
         <span class="stamp effectief" style="border-color:var(--brass-deep);color:var(--brass-deep);">Maandfiche</span>
         <div class="ticket-top"><div class="ticket-date" style="text-transform:capitalize;">${esc(m.label)}</div></div>
         <div class="ticket-meta">
-          ${(m.geplandUren!==undefined && m.geplandUren!==null) ? `<span>Gepland <b>${urenFmt(m.geplandUren)}u</b></span>` : ''}
-          <span>Effectief <b>${urenFmt(m.uren)}u</b></span>
+          ${(m.geplandUren!==undefined && m.geplandUren!==null) ? `<span>Gepland <b>${urenFmt(m.geplandUren)}</b></span>` : ''}
+          <span>Effectief <b>${urenFmt(m.uren)}</b></span>
           <span>${m.aantalDiensten} diensten samengevoegd</span>
         </div>
         <div class="ticket-bedrag" style="margin-top:8px;">${eur(m.bedrag)}</div>
@@ -718,7 +740,7 @@ function render(){
       <div class="ticket">
         <span class="stamp ${isEff?'effectief':'prognose'}">${isEff?'Effectief':'Prognose'}</span>
         <div class="ticket-top"><div class="ticket-date"><span class="dag">${dayLabel(s.date)}</span>${fmtDate(s.date)}</div></div>
-        <div class="ticket-meta"><span>Gepland <b>${s.planned}u</b></span><span>Effectief <b>${isEff ? s.actual+'u' : '—'}</b></span><span>€${rate}/u</span></div>
+        <div class="ticket-meta"><span>Gepland <b>${urenFmt(s.planned)}</b></span><span>Effectief <b>${isEff ? urenFmt(s.actual) : '—'}</b></span><span>€${rate}/u</span></div>
         ${s.note ? `<p class="hint" style="margin-top:6px;">${esc(s.note)}</p>` : ''}
         <div class="ticket-bedrag" style="margin-top:8px;">${eur(bedrag)}</div>
         <div class="ticket-actions">
